@@ -1,0 +1,70 @@
+{
+  "name": "Weekly Report Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://backend.careerflow.ai/api/analysis/dashboard",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "name": "GET Dashboard Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json;\nconst report = `Weekly Report: ${data.totalJobs} jobs applied, avg match ${data.avgMatch}%`;\nreturn [{ json: { report } }];"
+      },
+      "name": "Format Report",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.careerflow.ai/webhooks/n8n/weekly-report",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "summary", "value": "={{$json.report}}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "POST Report to Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Cron Trigger": {
+      "main": [[{ "node": "GET Dashboard Data", "type": "main", "index": 0 }]]
+    },
+    "GET Dashboard Data": {
+      "main": [[{ "node": "Format Report", "type": "main", "index": 0 }]]
+    },
+    "Format Report": {
+      "main": [[{ "node": "POST Report to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true
+}
