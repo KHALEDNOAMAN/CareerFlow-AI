@@ -1,0 +1,74 @@
+{
+  "name": "CV Processing Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cv-upload-trigger",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const cvText = items[0].json.body.cv_text;\nreturn [{ json: { cvText } }];"
+      },
+      "name": "Parse CV Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "headerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "gpt-4" },
+            { "name": "messages", "value": "[{\"role\":\"user\",\"content\":\"Extract skills from this CV: {{$json.cvText}}\"}]" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Call AI API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.careerflow.ai/webhooks/n8n/cv-processed",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "user_id", "value": "={{$node[\"Webhook Trigger\"].json.body.user_id}}" },
+            { "name": "skills", "value": "={{$json.choices[0].message.content}}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "POST to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Parse CV Data", "type": "main", "index": 0 }]]
+    },
+    "Parse CV Data": {
+      "main": [[{ "node": "Call AI API", "type": "main", "index": 0 }]]
+    },
+    "Call AI API": {
+      "main": [[{ "node": "POST to Backend", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true
+}
