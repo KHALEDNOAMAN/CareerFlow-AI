@@ -1,0 +1,87 @@
+{
+  "name": "Job Analysis Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "job-analysis-trigger",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.body.job_url}}",
+        "options": {}
+      },
+      "name": "Fetch Job Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const html = items[0].json.data;\n// Mock extraction logic\nconst jobDescription = html.substring(0, 1000);\nreturn [{ json: { jobDescription } }];"
+      },
+      "name": "Extract Text",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "headerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "gpt-4" },
+            { "name": "messages", "value": "[{\"role\":\"user\",\"content\":\"Analyze this job description: {{$json.jobDescription}}\"}]" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Call AI API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.careerflow.ai/webhooks/n8n/analysis-complete",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "user_id", "value": "={{$node[\"Webhook Trigger\"].json.body.user_id}}" },
+            { "name": "result", "value": "={{$json.choices[0].message.content}}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "POST to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Fetch Job Page", "type": "main", "index": 0 }]]
+    },
+    "Fetch Job Page": {
+      "main": [[{ "node": "Extract Text", "type": "main", "index": 0 }]]
+    },
+    "Extract Text": {
+      "main": [[{ "node": "Call AI API", "type": "main", "index": 0 }]]
+    },
+    "Call AI API": {
+      "main": [[{ "node": "POST to Backend", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true
+}
